@@ -339,3 +339,21 @@ These follow the course material and should be confirmed:
 ## Roadmap
 
 Beyond the current scope: LSM tree with size-tiered and leveled compaction, snapshots and checkpoints, prefix and range scans, iterators, SSTable compression (variable-length and delta encoding), data block hash index, MANIFEST and recovery, backups, probabilistic types (Bloom filter, Count-Min Sketch, HyperLogLog, SimHash), batch operations, TTL, BLOBs and keyspaces.
+
+## Development workflow & conventions
+
+To keep the codebase clean and maintainable, please follow these branching, commit, and coding conventions while working on the project.
+
+### 1. Branching strategy
+We use feature and fix branches branching off from `main`. Keep pull requests scoped to a single logical change.
+
+* **Feature branches:** `feature/<short-description>` (e.g., `feature/skiplist-memtable`, `feature/bloom-filter`)
+* **Bug fixes:** `fix/<short-description>` (e.g., `fix/wal-crc-checksum`, `fix/sstable-reader-offset`)
+
+Never push directly to `main`. Open a pull request once your implementation and local tests are ready.
+
+### 2. Commit message conventions
+We follow conventional commit guidelines to keep the Git history readable and structured. Each commit message must follow this format:
+
+```text
+<type>: <short summary>
