@@ -31,7 +31,7 @@ var (
 type Record struct {
 	Timestamp uint64 // microseconds since 1970
 	Tombstone byte
-	Key       []byte
+	Key       string
 	Value     []byte
 }
 
@@ -74,9 +74,8 @@ func (r *Record) Deserialize(buf []byte) (*Record, error) {
 		return nil, ErrCorruptedRecord
 	}
 
-	key := make([]byte, keySize)
+	key := string(buf[HeaderSize : HeaderSize+keySize])
 	value := make([]byte, valueSize)
-	copy(key, buf[HeaderSize:HeaderSize+keySize])
 	copy(value, buf[HeaderSize+keySize:HeaderSize+keySize+valueSize])
 
 	return &Record{
