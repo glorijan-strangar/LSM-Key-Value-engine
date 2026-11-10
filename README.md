@@ -143,22 +143,22 @@ The same logical record is used in the WAL and in SSTable Data.
 
 ```
 +-----------+----------------+--------------+----------------+------------------+-----+-------+
-| CRC (4B)  | Timestamp (16B)| Tombstone(1B)| Key Size (8B)  | Value Size (8B)  | Key | Value |
+| CRC (4B)  | Timestamp (8B) | Tombstone(1B)| Key Size (8B)  | Value Size (8B)  | Key | Value |
 +-----------+----------------+--------------+----------------+------------------+-----+-------+
 ```
 
 | Field | Offset | Size | Description |
 |---|---|---|---|
 | CRC | 0 | 4 B | CRC32 (IEEE, `hash/crc32`) over every byte after this field, from Timestamp to the end of Value |
-| Timestamp | 4 | 16 B | Time of the operation in Unix seconds, as a little-endian `uint64` in the first 8 bytes. The remaining 8 bytes are reserved and set to zero |
-| Tombstone | 20 | 1 B | `0` = live record, `1` = deleted. A deleted record has Value Size `0` and no value bytes |
-| Key Size | 21 | 8 B | Length of Key in bytes (`uint64`) |
-| Value Size | 29 | 8 B | Length of Value in bytes (`uint64`) |
-| Key | 37 | Key Size | Key as UTF-8 bytes |
-| Value | 37 + Key Size | Value Size | Raw bytes. The console accepts values as strings and converts them to bytes |
+| Timestamp | 4 | 8 B | Time of the operation in Unix microseconds |
+| Tombstone | 12 | 1 B | `0` = live record, `1` = deleted. A deleted record has Value Size `0` and no value bytes |
+| Key Size | 13 | 8 B | Length of Key in bytes (`uint64`) |
+| Value Size | 21 | 8 B | Length of Value in bytes (`uint64`) |
+| Key | 29 | Key Size | Key as UTF-8 bytes |
+| Value | 29 + Key Size | Value Size | Raw bytes. The console accepts values as strings and converts them to bytes |
 
 - All numeric fields are **little-endian**.
-- The fixed header is $4 + 16 + 1 + 8 + 8 = 37$ bytes.
+- The fixed header is $4 + 8 + 1 + 8 + 8 = 29$ bytes.
 - Serialization uses only `encoding/binary` and `hash/crc32`. No serialization libraries are used.
 - On read, the CRC is recomputed and compared. A mismatch marks the record as corrupted.
 
