@@ -316,7 +316,10 @@ We use feature and fix branches branching off from `main`. Keep pull requests sc
 
 Never push directly to `main`. Open a pull request once your implementation and local tests are ready.
 
-### 2. Commit message conventions
+### 2. Commit conventions
+* **How often to commit:** Commit early and often. Make a commit whenever you complete a logical, working, and tested step (e.g., after writing a specific function, fixing a bug, or adding a unit test). Avoid large, monolithic commits that bundle unrelated changes.
+* **Rule of thumb:** One commit should represent a single, self-contained change that leaves the codebase in a stable state. Never commit broken code or failing tests to a feature branch unless it is explicitly marked as a temporary Work In Progress (`WIP`).
+
 We follow conventional commit guidelines to keep the Git history readable and structured. Each commit message must follow this format:
 
 ~~~~text
@@ -337,7 +340,20 @@ git commit -m "feat(merkle): implement tree generation for sstable metadata"
 git commit -m "fix(engine): resolve get path race condition on memtable flush"
 ~~~~
 
-### 3. Go coding conventions & project standards
+### 4. Issue tracking & management
+We use GitHub Issues to track bugs, plan upcoming features, and discuss design decisions. Keeping issues organized helps track progress across components.
+
+* **When to open an issue:**
+  * **Bug Reports:** When you encounter unexpected behavior, data corruption, or panic during testing or normal execution.
+  * **Feature Proposals:** Before starting a complex new module (e.g., adding compaction or LSM tree layers), open an issue to outline the design.
+  * **Task Breakdown:** For splitting larger coursework requirements into manageable sub-tasks.
+
+* **How to write a good issue:**
+  * **Clear Title:** Use a descriptive title prefixed with the component or scope (e.g., `[WAL] Segment rotation fails when block boundary is exactly reached` or `[SSTable] Design Merkle tree validation flow`).
+  * **Description/Context:** Provide steps to reproduce for bugs, or a clear specification/proposal for new features.
+  * **Linking PRs:** Reference the issue number in your pull request description (e.g., `Closes #12` or `Relates to #8`) so they automatically link and close upon merging.
+
+### 4. Go coding conventions & project standards
 * **Error handling:** Never ignore errors using `_`. Always handle them explicitly, wrap them with context using `fmt.Errorf("...: %w", err)` where appropriate, and return them up the stack.
 * **File I/O & Block alignment:** All file operations must go through the block manager using fixed-size blocks (4KB, 8KB, or 16KB). Avoid direct unbuffered reads/writes outside designated components.
 * **Concurrency:** Ensure components shared across read and write paths (such as the memtable, cache, or block manager) are thread-safe and properly guarded using sync primitives (`sync.RWMutex`, `sync.Mutex`).
