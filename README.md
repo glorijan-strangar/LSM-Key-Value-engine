@@ -304,6 +304,49 @@ Every package has its own `_test.go` files. Important cases:
 - SSTable: lookup through Summary, Index and Data, missing keys, tombstones
 - engine: `PUT`, restart, `GET`, including after a flush
 
+## Development workflow & conventions
+
+To keep the codebase clean and maintainable, please follow these branching, commit, and coding conventions while working on the project.
+
+### 1. Branching strategy
+We use feature and fix branches branching off from `main`. Keep pull requests scoped to a single logical change.
+
+* **Feature branches:** `feature/<short-description>` (e.g., `feature/skiplist-memtable`, `feature/bloom-filter`)
+* **Bug fixes:** `fix/<short-description>` (e.g., `fix/wal-crc-checksum`, `fix/sstable-reader-offset`)
+
+Never push directly to `main`. Open a pull request once your implementation and local tests are ready.
+
+### 2. Commit message conventions
+We follow conventional commit guidelines to keep the Git history readable and structured. Each commit message must follow this format:
+
+~~~~text
+<type>(<scope>): <short summary>
+~~~~
+
+**Allowed types:**
+* `feat`: Adding a new feature or component (e.g., `feat(wal): implement block-based segment rotation`)
+* `fix`: Fixing a bug (e.g., `fix(blockmanager): handle out-of-bounds block index read`)
+* `refactor`: Code change that neither fixes a bug nor adds a feature (e.g., `refactor(sstable): clean up summary index search logic`)
+* `test`: Adding or updating tests (e.g., `test(memtable): add concurrent skip list unit tests`)
+* `docs`: Documentation updates (e.g., `docs(readme): update project layout tree`)
+* `chore`: Maintenance tasks, dependencies, or tooling (e.g., `chore: update go version`)
+
+**Examples of good commits:**
+~~~~bash
+git commit -m "feat(merkle): implement tree generation for sstable metadata"
+git commit -m "fix(engine): resolve get path race condition on memtable flush"
+~~~~
+
+### 3. Go coding conventions & project standards
+* **Error handling:** Never ignore errors using `_`. Always handle them explicitly, wrap them with context using `fmt.Errorf("...: %w", err)` where appropriate, and return them up the stack.
+* **File I/O & Block alignment:** All file operations must go through the block manager using fixed-size blocks (4KB, 8KB, or 16KB). Avoid direct unbuffered reads/writes outside designated components.
+* **Concurrency:** Ensure components shared across read and write paths (such as the memtable, cache, or block manager) are thread-safe and properly guarded using sync primitives (`sync.RWMutex`, `sync.Mutex`).
+* **Configuration:** Do not hardcode magic numbers, paths, or limits. Fetch settings dynamically from the loaded configuration struct, falling back to safe defaults if fields are missing.
+* **Testing:** Every new module or significant change should include corresponding unit tests under the same package or in a `_test.go` file. Run tests locally before opening a PR:
+  ~~~~bash
+  go test ./... -v
+  ~~~~
+
 ## Status
 
 **Grade 6**
@@ -339,21 +382,3 @@ These follow the course material and should be confirmed:
 ## Roadmap
 
 Beyond the current scope: LSM tree with size-tiered and leveled compaction, snapshots and checkpoints, prefix and range scans, iterators, SSTable compression (variable-length and delta encoding), data block hash index, MANIFEST and recovery, backups, probabilistic types (Bloom filter, Count-Min Sketch, HyperLogLog, SimHash), batch operations, TTL, BLOBs and keyspaces.
-
-## Development workflow & conventions
-
-To keep the codebase clean and maintainable, please follow these branching, commit, and coding conventions while working on the project.
-
-### 1. Branching strategy
-We use feature and fix branches branching off from `main`. Keep pull requests scoped to a single logical change.
-
-* **Feature branches:** `feature/<short-description>` (e.g., `feature/skiplist-memtable`, `feature/bloom-filter`)
-* **Bug fixes:** `fix/<short-description>` (e.g., `fix/wal-crc-checksum`, `fix/sstable-reader-offset`)
-
-Never push directly to `main`. Open a pull request once your implementation and local tests are ready.
-
-### 2. Commit message conventions
-We follow conventional commit guidelines to keep the Git history readable and structured. Each commit message must follow this format:
-
-```text
-<type>: <short summary>
