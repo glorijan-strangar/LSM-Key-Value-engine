@@ -3,6 +3,7 @@ package record
 import (
 	"encoding/binary"
 	"errors"
+	"fmt"
 	"hash/crc32"
 )
 
@@ -62,11 +63,11 @@ func (r *Record) Deserialize(buf []byte) (*Record, error) {
 
 	bufLen := uint64(len(buf))
 	if keySize > bufLen {
-		return nil, ErrInvalidRecord
+		return nil, fmt.Errorf("%w: keySize = %d, bufLen = %d", ErrInvalidRecord, keySize, bufLen)
 	}
 	total := uint64(HeaderSize + keySize + valueSize)
 	if total > bufLen {
-		return nil, ErrInvalidRecord
+		return nil, fmt.Errorf("%w: total = %d, bufLen = %d", ErrInvalidRecord, total, bufLen)
 	}
 
 	bufCrc := endianness.Uint32(buf[0:])

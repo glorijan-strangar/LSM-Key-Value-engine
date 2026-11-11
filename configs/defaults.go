@@ -1,0 +1,15 @@
+package configs
+
+const (
+	BLOCK_SIZE_KB       = 4
+	BLOCK_CACHE_SIZE_KB = 4096 // 4MB
+	CACHE_SIZE_KB       = 2048 // 2MB
+	SUMMARY_SPARSITY    = 4
+
+	WAL_SEGMENT_SIZE_IN_BLOCKS = 64   // 64 * 4KB = 256KB in eg.
+	MEMTABLE_MAX_SIZE_KB       = 2048 // 2MB
+	MEMTABLE_INSTANCES_COUNT   = 2    // one read-write, one read only
+
+	TOKEN_BUCKET_CAPACITY           = 100
+	TOKEN_BUCKET_REFILL_INTERVAL_MS = 1000
+)
