@@ -10,7 +10,7 @@ A persistent key-value storage engine written in Go. Data is written through a w
 2. [Quick start](#quick-start)
 3. [Project layout](#project-layout)
 4. [Architecture](#architecture)
-5. [Record format](#record-format)
+5. [Record and WAL format](#record-and-wal-format)
 6. [Components](#components)
 7. [On-disk layout](#on-disk-layout)
 8. [Configuration](#configuration)
@@ -137,7 +137,7 @@ flowchart LR
 3. SSTables, newest to oldest. For each one: Bloom filter, then Summary range (min/max key), then Index, then Data. A tombstone means "not found".
 4. A value found on disk is put into the read cache. `PUT` and `DELETE` update or invalidate the cached entry so the cache never serves stale data.
 
-## Record format
+## Record and WAL format
 
 The same logical record is used in the WAL and in SSTable Data.
 
@@ -161,6 +161,19 @@ The same logical record is used in the WAL and in SSTable Data.
 - The fixed header is $4 + 8 + 1 + 8 + 8 = 29$ bytes.
 - Serialization uses only `encoding/binary` and `hash/crc32`. No serialization libraries are used.
 - On read, the CRC is recomputed and compared. A mismatch marks the record as corrupted.
+
+The WAL fragment format includes:
+```
++-----------+-----------+-----------+-----------------+
+| CRC (4B)  | Size (2B) | Type (1B) | Payload (SizeB) |
++-----------+-----------+-----------+-----------------+
+```
+| Field | Offset | Size | Description |
+|---|---|---|---|
+| CRC | 0 | 4 B | CRC32 (IEEE, `hash/crc32`) over every byte after this field, from Size to the end of Payload |
+| Size | 4 | 2 B | Length of Payload (in this fragment!) in bytes (`uint16`) |
+| Type | 6 | 1 B | The type of the record, FULL/FIRST/MIDDLE/LAST |
+| Payload | 7 | Size | The raw bytes of the record |
 
 ## Components
 
