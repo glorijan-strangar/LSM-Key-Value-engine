@@ -47,7 +47,7 @@ func (r *Record) Serialize() []byte {
 	return buf
 }
 
-func (r *Record) Deserialize(buf []byte) (*Record, error) {
+func Deserialize(buf []byte) (*Record, error) {
 	if len(buf) < HeaderSize {
 		return nil, ErrInvalidRecord
 	}
