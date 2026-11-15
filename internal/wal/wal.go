@@ -143,7 +143,7 @@ func (w *WAL) Append(rec *record.Record) error {
 // DecodeFragment decodes exactly one fragment, including its header and
 // payload. frag must exclude block padding and any following fragments. The
 // returned payload references frag's backing array.
-func (w *WAL) gDecodeFragment(frag []byte) (*Fragment, error) {
+func (w *WAL) DecodeFragment(frag []byte) (*Fragment, error) {
 	if len(frag) < FragHeaderSize {
 		return nil, fmt.Errorf("%w: frag length = %d, fragHeaderSize = %d", ErrInvalidFragment, len(frag), FragHeaderSize)
 	}
