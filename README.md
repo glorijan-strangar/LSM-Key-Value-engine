@@ -142,25 +142,23 @@ flowchart LR
 The same logical record is used in the WAL and in SSTable Data.
 
 ```
-+-----------+----------------+--------------+----------------+------------------+-----+-------+
-| CRC (4B)  | Timestamp (8B) | Tombstone(1B)| Key Size (8B)  | Value Size (8B)  | Key | Value |
-+-----------+----------------+--------------+----------------+------------------+-----+-------+
++----------------+----------------+--------------+-----------------+-----+-------+
+| Timestamp (8B) | Tombstone (1B) | Key Size (8B) | Value Size (8B) | Key | Value |
++----------------+----------------+--------------+-----------------+-----+-------+
 ```
 
 | Field | Offset | Size | Description |
 |---|---|---|---|
-| CRC | 0 | 4 B | CRC32 (IEEE, `hash/crc32`) over every byte after this field, from Timestamp to the end of Value |
-| Timestamp | 4 | 8 B | Time of the operation in Unix microseconds |
-| Tombstone | 12 | 1 B | `0` = live record, `1` = deleted. A deleted record has Value Size `0` and no value bytes |
-| Key Size | 13 | 8 B | Length of Key in bytes (`uint64`) |
-| Value Size | 21 | 8 B | Length of Value in bytes (`uint64`) |
-| Key | 29 | Key Size | Key as UTF-8 bytes |
-| Value | 29 + Key Size | Value Size | Raw bytes. The console accepts values as strings and converts them to bytes |
+| Timestamp | 0 | 8 B | Time of the operation in Unix microseconds |
+| Tombstone | 8 | 1 B | `0` = live record, `1` = deleted. A deleted record has Value Size `0` and no value bytes |
+| Key Size | 9 | 8 B | Length of Key in bytes (`uint64`) |
+| Value Size | 17 | 8 B | Length of Value in bytes (`uint64`) |
+| Key | 25 | Key Size | Key as UTF-8 bytes |
+| Value | 25 + Key Size | Value Size | Raw bytes. The console accepts values as strings and converts them to bytes |
 
 - All numeric fields are **little-endian**.
-- The fixed header is $4 + 8 + 1 + 8 + 8 = 29$ bytes.
-- Serialization uses only `encoding/binary` and `hash/crc32`. No serialization libraries are used.
-- On read, the CRC is recomputed and compared. A mismatch marks the record as corrupted.
+- The fixed header is $8 + 1 + 8 + 8 = 25$ bytes.
+- Serialization uses only `encoding/binary`. No serialization libraries are used.
 
 ## Components
 
@@ -298,7 +296,7 @@ go test ./...
 
 Every package has its own `_test.go` files. Important cases:
 
-- record round-trip, corrupted CRC, empty value, tombstone
+- record round-trip, empty value, tombstone, malformed/truncated input
 - WAL: many records over several segments, fragmented records, a damaged tail, replay after a restart
 - block manager: cache hit on the second read, cache update on write
 - SSTable: lookup through Summary, Index and Data, missing keys, tombstones
