@@ -4,19 +4,17 @@ import (
 	"encoding/binary"
 	"errors"
 	"fmt"
-	"hash/crc32"
 )
 
 const (
-	crcSize       = 4
 	timestampSize = 8
 	tombstoneSize = 1
 	keySizeSize   = 8
 	valueSizeSize = 8
 
-	HeaderSize = crcSize + timestampSize + tombstoneSize + keySizeSize + valueSizeSize
+	HeaderSize = timestampSize + tombstoneSize + keySizeSize + valueSizeSize
 
-	timestampOff = crcSize
+	timestampOff = 0
 	tombstoneOff = timestampOff + timestampSize
 	keySizeOff   = tombstoneOff + tombstoneSize
 	valueSizeOff = keySizeOff + keySizeSize
@@ -25,8 +23,7 @@ const (
 var (
 	endianness = binary.LittleEndian
 
-	ErrCorruptedRecord = errors.New("[RECORD]: CRC mismatch.")
-	ErrInvalidRecord   = errors.New("[RECORD]: Invalid record. Size or type mismatch.")
+	ErrInvalidRecord = errors.New("[RECORD]: Invalid record. Size or type mismatch.")
 )
 
 type Record struct {
@@ -41,14 +38,11 @@ func (r *Record) Serialize() []byte {
 	buf := make([]byte, totalSize)
 
 	endianness.PutUint64(buf[timestampOff:], r.Timestamp)
-	buf[timestampOff] = r.Tombstone
+	buf[tombstoneOff] = r.Tombstone
 	endianness.PutUint64(buf[keySizeOff:], uint64(len(r.Key)))
 	endianness.PutUint64(buf[valueSizeOff:], uint64(len(r.Value)))
 	copy(buf[HeaderSize:], r.Key)
 	copy(buf[HeaderSize+len(r.Key):], r.Value)
-
-	crc := crc32.ChecksumIEEE(buf[crcSize:])
-	endianness.PutUint32(buf[0:], uint32(crc))
 
 	return buf
 }
@@ -68,11 +62,6 @@ func (r *Record) Deserialize(buf []byte) (*Record, error) {
 	total := uint64(HeaderSize + keySize + valueSize)
 	if total > bufLen {
 		return nil, fmt.Errorf("%w: total = %d, bufLen = %d", ErrInvalidRecord, total, bufLen)
-	}
-
-	bufCrc := endianness.Uint32(buf[0:])
-	if crc32.ChecksumIEEE(buf[crcSize:total]) != bufCrc {
-		return nil, ErrCorruptedRecord
 	}
 
 	key := string(buf[HeaderSize : HeaderSize+keySize])
