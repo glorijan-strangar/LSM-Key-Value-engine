@@ -191,7 +191,27 @@ All reads and writes of files go through the block manager, never directly throu
 - A record larger than the free space in the current block is fragmented across blocks. Padding is applied where a block cannot be filled.
 - Each record ends with a trailing canary field.
 - Content is flushed to disk with `fdatasync` (`syscall.Fdatasync` on Linux, `File.Sync()` elsewhere, selected by build tags).
-- Records are read one by one, never by loading a whole segment into memory. The CRC is checked on every record.
+Each WAL fragment has a 15-byte header followed by its payload:
+
+```
++-----------+--------------+--------------+----------------+---------+
+| CRC (4 B) | Size (2 B)   | Type (1 B)   | Log number (8 B)| Payload |
++-----------+--------------+--------------+----------------+---------+
+```
+
+| Field | Offset | Size | Description |
+|---|---:|---:|---|
+| CRC | 0 | 4 B | CRC32 (IEEE) over the bytes from Size through the end of this fragment's Payload |
+| Size | 4 | 2 B | Payload length in bytes (`uint16`) |
+| Type | 6 | 1 B | `1` = FULL, `2` = FIRST, `3` = MIDDLE, `4` = LAST |
+| Log number | 7 | 8 B | Sequence number identifying the logical WAL record (`uint64`) |
+| Payload | 15 | Size | Part or all of the serialized record; a complete record payload ends with the 4-byte canary `EF BE AD DE` |
+
+All numeric fields are little-endian. A FULL fragment contains one complete serialized record and its canary. A fragmented record is represented by FIRST, zero or more MIDDLE fragments, and LAST; the fragments share a log number. Block padding is outside fragment payloads and is not covered by a fragment CRC.
+
+`DecodeFragment` accepts exactly one encoded fragment, from its CRC byte through the last payload byte. The input must exclude block padding and any following fragments. It checks the fragment size and CRC before returning its payload.
+
+- Records are read one by one, never by loading a whole segment into memory. The CRC is checked on every fragment.
 - On startup the WAL is replayed in order to rebuild the memtable(s).
 - A segment is deleted only after all of its data is persisted in an SSTable.
 
