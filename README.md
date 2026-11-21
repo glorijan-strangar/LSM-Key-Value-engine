@@ -1,6 +1,6 @@
 # kvengine
 
-A persistent key-value storage engine written in Go. Data is written through a write-ahead log into an in-memory memtable, flushed to immutable sorted files on disk (SSTables), and read back through a layered read path with caching and Bloom filters. The engine is used through an interactive console menu.
+A course project to build a persistent key-value storage engine in Go. The design uses a write-ahead log, in-memory memtables, and immutable sorted files on disk (SSTables), with reads served through memtables, a cache, and SSTables. The console entry point is currently a stub.
 
 > Course project (Advanced Algorithms and Data Structures, 2026/2027). Current scope: everything required for grade 8. Compaction and the LSM tree are out of scope for now (see [Roadmap](#roadmap)).
 
@@ -22,6 +22,8 @@ A persistent key-value storage engine written in Go. Data is written through a w
 
 ## Features
 
+These are the planned engine features. See [Status](#status) for implementation progress.
+
 - `PUT(key, value)`, `GET(key)`, `DELETE(key)` backed by a real write path and read path
 - Segmented, block-based write-ahead log with CRC checks, fragmentation of large records, padding, trailing canary and `fdatasync`
 - Memtable with pluggable implementation (hash map or skip list), optionally split into `N` instances
@@ -34,34 +36,34 @@ A persistent key-value storage engine written in Go. Data is written through a w
 
 ## Quick start
 
-Requirements: Go 1.22 or newer.
+The Go version is declared in `go.mod` (currently 1.27).
 
 ```bash
-git clone https://github.com/<your-team>/kvengine.git
-cd kvengine
-
-go build -o kvengine ./cmd/kvengine
-./kvengine -config configs/config.json
+git clone https://github.com/glorijan-strangar/LSM-Key-Value-engine.git
+cd LSM-Key-Value-engine
 ```
 
-If the config file or any single setting is missing, defaults from the code are used. Runtime data is written to `data/` (ignored by git).
+The console executable and its command line options are planned. See [Testing](#testing) for the repository's test commands.
 
 ## Project layout
 
+The tree includes planned packages and directories alongside the current source.
+
 ```
-kvengine/
+LSM-Key-Value-engine/
 ├── cmd/
 │   └── kvengine/
-│       └── main.go              # entry point: load config, build engine, start menu
+│       └── main.go              # console entry point (stub)
 ├── internal/
-│   ├── config/                  # JSON loading, validation, default values
-│   ├── record/                  # Record type + binary (de)serialization + CRC
+│   ├── enums/                   # StorageKind for selecting a memtable backend
+│   ├── record/                  # Record type and binary serialization
 │   ├── lru/                     # generic LRU cache (used by block cache and read cache)
 │   ├── blockmanager/            # block read/write by (path, block number) + block cache
 │   ├── wal/                     # segmented write-ahead log, recovery
 │   │   ├── sync_linux.go        #   fdatasync (build tag: linux)
 │   │   └── sync_other.go        #   Sync() fallback for other platforms
-│   ├── memtable/                # Memtable interface + hashmap.go + skiplist.go
+│   ├── memtable/                # Memtable operations and storage selection
+│   │   └── structures/          # Storage interface and skip_list.go
 │   ├── bloom/                   # Bloom filter
 │   ├── merkle/                  # Merkle tree build + validation
 │   ├── sstable/                 # writer, reader, data, index, summary, filter, metadata
@@ -69,7 +71,9 @@ kvengine/
 │   ├── engine/                  # orchestrates write path and read path
 │   └── cli/                     # interactive console menu
 ├── configs/
-│   └── config.json              # example configuration
+│   ├── config.go                # JSON loading
+│   ├── defaults.go              # default values
+│   └── config.json              # configuration file placeholder
 ├── docs/                        # diagrams, design notes
 ├── data/                        # runtime data (gitignored)
 ├── go.mod
@@ -94,12 +98,16 @@ flowchart TD
     wal --> record
     sstable --> record
     memtable --> record
-    engine --> config
+    memtable --> structures
+    memtable --> enums
+    engine --> configs
 ```
 
 `internal/` keeps everything private to the module. `cmd/` stays thin. `engine` knows nothing about the console, so it can be tested without it.
 
 ## Architecture
+
+These diagrams describe the intended engine once its components are connected.
 
 ### Write path
 
@@ -139,7 +147,7 @@ flowchart LR
 
 ## Record and WAL format
 
-The same logical record is used in the WAL and in SSTable Data.
+The same logical record is intended for the WAL and SSTable Data. `(*Record).Serialize()` encodes a record and the package function `record.Deserialize(buf)` decodes it.
 
 ```
 +----------------+----------------+--------------+-----------------+-----+-------+
@@ -153,25 +161,15 @@ The same logical record is used in the WAL and in SSTable Data.
 | Tombstone | 8 | 1 B | `0` = live record, `1` = deleted. A deleted record has Value Size `0` and no value bytes |
 | Key Size | 9 | 8 B | Length of Key in bytes (`uint64`) |
 | Value Size | 17 | 8 B | Length of Value in bytes (`uint64`) |
-| Key | 25 | Key Size | Key as UTF-8 bytes |
+| Key | 25 | Key Size | Raw bytes of the Go string |
 | Value | 25 + Key Size | Value Size | Raw bytes. The console accepts values as strings and converts them to bytes |
 
 - All numeric fields are **little-endian**.
 - The fixed header is $8 + 1 + 8 + 8 = 25$ bytes.
+- CRC checks belong to the WAL fragment layer. The record layout has no CRC field.
 - Serialization uses only `encoding/binary`. No serialization libraries are used.
 
-The WAL fragment format includes:
-```
-+-----------+-----------+-----------+-----------------+
-| CRC (4B)  | Size (2B) | Type (1B) | Payload (SizeB) |
-+-----------+-----------+-----------+-----------------+
-```
-| Field | Offset | Size | Description |
-|---|---|---|---|
-| CRC | 0 | 4 B | CRC32 (IEEE, `hash/crc32`) over every byte after this field, from Size to the end of Payload |
-| Size | 4 | 2 B | Length of Payload (in this fragment!) in bytes (`uint16`) |
-| Type | 6 | 1 B | The type of the record, FULL/FIRST/MIDDLE/LAST |
-| Payload | 7 | Size | The raw bytes of the record |
+See [Write-ahead log](#write-ahead-log-wal) for the WAL fragment layout.
 
 ## Components
 
@@ -187,10 +185,13 @@ All reads and writes of files go through the block manager, never directly throu
 
 ### Write-ahead log (WAL)
 
+The WAL package is absent from the current memtable branch. The format below documents the design.
+
 - Append-only, split into segments of a fixed size given in blocks.
 - A record larger than the free space in the current block is fragmented across blocks. Padding is applied where a block cannot be filled.
 - Each record ends with a trailing canary field.
 - Content is flushed to disk with `fdatasync` (`syscall.Fdatasync` on Linux, `File.Sync()` elsewhere, selected by build tags).
+
 Each WAL fragment has a 15-byte header followed by its payload:
 
 ```
@@ -217,10 +218,11 @@ All numeric fields are little-endian. A FULL fragment contains one complete seri
 
 ### Memtable
 
-- A common interface: add/update, logical delete (tombstone), find, and sorted iteration for flush.
-- Implementations: **hash map** and **skip list**, selected in the config. The hash map sorts keys at flush time. The skip list is already ordered.
-- The size limit is configured as a number of elements or as memory in KB.
-- `N` instances can be kept in memory: `N-1` read-only and one read-write. A flush happens when all `N` are full.
+`NewMemtable` takes an `enums.StorageKind` and a size limit. `SkipList` is the implemented backend. The enum also declares `HashMap` and `BTree` for future backends. Backend selection is currently passed to the constructor in code.
+
+The `structures.Storage` interface exposes `Get`, `Put`, `Delete`, and `Size`. The skip list stores values at the bottom level and supports physical removal. At the memtable layer, `Delete` instead upserts a serialized tombstone with an empty value and a Unix microsecond timestamp. `Get` returns the stored bytes. `Freeze` makes the memtable reject subsequent `Put` and `Delete` calls.
+
+The skip list's size accounting and the memtable's capacity policy are still in progress. Sorted iteration, SSTable flushing, and rotation across `N` memtables are planned. The skip list keeps keys in order, and the planned hash map backend will sort its keys for a flush.
 
 ### SSTable
 
@@ -271,44 +273,39 @@ The `L0` in the name reserves the level for the future LSM tree, so files will n
 
 ## Configuration
 
-All settings live in one JSON file. Any missing setting falls back to the default from the code.
+`configs.LoadConfig()` reads `config.json` from the working directory. It starts with the defaults below and overrides fields present in the JSON file. A missing or empty file uses the defaults. The file under `configs/` is currently a placeholder.
 
 ```json
 {
-  "data_dir": "data",
-  "block_size": 4096,
-  "block_cache_blocks": 256,
-  "wal_segment_blocks": 16,
-  "memtable_type": "skiplist",
-  "memtable_max_entries": 1000,
-  "memtable_max_kb": 0,
-  "memtable_count": 1,
-  "summary_sparsity": 5,
-  "bloom_false_positive_rate": 0.01,
-  "read_cache_entries": 1000,
-  "rate_limit_tokens": 100,
-  "rate_limit_interval_seconds": 60
+  "block_size_kb": 4,
+  "block_cache_size_kb": 4096,
+  "cache_size_kb": 2048,
+  "summary_sparsity": 4,
+  "wal_segment_size_in_blocks": 64,
+  "memtable_max_size_kb": 2048,
+  "memtable_instances_count": 2,
+  "token_bucket_capacity": 100,
+  "token_bucket_refill_interval_ms": 1000
 }
 ```
 
-| Key | Meaning | Allowed values |
-|---|---|---|
-| `block_size` | Block size in bytes | 4096, 8192, 16384 |
-| `block_cache_blocks` | Block cache capacity (blocks) | > 0 |
-| `wal_segment_blocks` | WAL segment size in blocks | > 0 |
-| `memtable_type` | Memtable implementation | `hashmap`, `skiplist` |
-| `memtable_max_entries` | Memtable limit by element count | > 0 |
-| `memtable_max_kb` | Memtable limit by memory. `0` = use element count | >= 0 |
-| `memtable_count` | Number of memtables `N` | >= 1 |
-| `summary_sparsity` | Every $k$-th Index entry goes to Summary | >= 1 |
-| `bloom_false_positive_rate` | Target Bloom false-positive rate $p$ | $0 < p < 1$ |
-| `read_cache_entries` | Read cache capacity (records) | > 0 |
-| `rate_limit_tokens` | Bucket size | > 0 |
-| `rate_limit_interval_seconds` | Refill interval | > 0 |
+| Key | Meaning |
+|---|---|
+| `block_size_kb` | Block size in KB |
+| `block_cache_size_kb` | Block cache capacity in KB |
+| `cache_size_kb` | Read cache capacity in KB |
+| `summary_sparsity` | Every $k$-th Index entry goes to Summary |
+| `wal_segment_size_in_blocks` | WAL segment size in blocks |
+| `memtable_max_size_kb` | Memtable size limit in KB |
+| `memtable_instances_count` | Number of memtables `N` |
+| `token_bucket_capacity` | Bucket size in tokens |
+| `token_bucket_refill_interval_ms` | Refill interval in milliseconds |
 
-The configuration is validated at startup, and invalid values stop the program with a clear message.
+The loader reports file read and JSON decoding errors. Range validation, backend selection from JSON, and a memtable limit by element count are pending.
 
 ## Console menu
+
+Planned menu:
 
 ```
 1) PUT
@@ -327,9 +324,8 @@ go vet ./...
 go test ./...
 ```
 
-Every package has its own `_test.go` files. Important cases:
+The existing record tests cover the binary layout, round trips, empty values, tombstones, and malformed or truncated input. Planned coverage for the remaining components includes:
 
-- record round-trip, empty value, tombstone, malformed/truncated input
 - WAL: many records over several segments, fragmented records, a damaged tail, replay after a restart
 - block manager: cache hit on the second read, cache update on write
 - SSTable: lookup through Summary, Index and Data, missing keys, tombstones
@@ -398,7 +394,7 @@ We use GitHub Issues to track bugs, plan upcoming features, and discuss design d
 
 **Grade 6**
 - [ ] Config (2.1)
-- [ ] Record
+- [x] Record
 - [ ] Block manager and block cache (1.6)
 - [ ] WAL (1.1)
 - [ ] Memtable, hash map (1.2)
@@ -408,7 +404,7 @@ We use GitHub Issues to track bugs, plan upcoming features, and discuss design d
 **Grade 7**
 - [ ] Merkle tree metadata and validation (1.3.5)
 - [ ] LRU read cache (1.5)
-- [ ] Skip list memtable (1.2[DZ1])
+- [ ] Skip list memtable (1.2[DZ1]) — basic storage and memtable operations are in place
 - [ ] Configurable Summary sparsity (1.3[DZ1])
 
 **Grade 8**
@@ -420,7 +416,6 @@ We use GitHub Issues to track bugs, plan upcoming features, and discuss design d
 
 These follow the course material and should be confirmed:
 
-- Exact WAL fragment header and the canary value.
 - Whether a fragmented record may cross a segment boundary.
 - Whether SSTable components stay as separate files (current choice) or become one file.
 - Hash function for the Merkle tree.

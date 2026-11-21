@@ -20,7 +20,7 @@ func TestSerializeDeserializeRoundTrip(t *testing.T) {
 		t.Fatalf("serialized size = %d, want %d", got, want)
 	}
 
-	decoded, err := new(Record).Deserialize(encoded)
+	decoded, err := Deserialize(encoded)
 	if err != nil {
 		t.Fatalf("Deserialize() error = %v", err)
 	}
@@ -59,7 +59,7 @@ func TestSerializeUsesCRCFreeLittleEndianLayout(t *testing.T) {
 func TestSerializeDeserializeEmptyValue(t *testing.T) {
 	original := &Record{Timestamp: 9, Key: "empty", Value: []byte{}}
 
-	decoded, err := new(Record).Deserialize(original.Serialize())
+	decoded, err := Deserialize(original.Serialize())
 	if err != nil {
 		t.Fatalf("Deserialize() error = %v", err)
 	}
@@ -71,7 +71,7 @@ func TestSerializeDeserializeEmptyValue(t *testing.T) {
 func TestSerializeDeserializeTombstone(t *testing.T) {
 	original := &Record{Timestamp: 10, Tombstone: 1, Key: "deleted", Value: []byte{}}
 
-	decoded, err := new(Record).Deserialize(original.Serialize())
+	decoded, err := Deserialize(original.Serialize())
 	if err != nil {
 		t.Fatalf("Deserialize() error = %v", err)
 	}
@@ -101,7 +101,7 @@ func TestDeserializeRejectsInvalidSizes(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			_, err := new(Record).Deserialize(tt.input)
+			_, err := Deserialize(tt.input)
 			if !errors.Is(err, ErrInvalidRecord) {
 				t.Fatalf("Deserialize() error = %v, want %v", err, ErrInvalidRecord)
 			}

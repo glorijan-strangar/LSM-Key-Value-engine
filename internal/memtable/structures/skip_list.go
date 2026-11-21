@@ -30,18 +30,18 @@ const (
 type SkipList struct {
 	head       *skipListNode
 	currHeight uint8
-	Size       uint32 // gives us max cap at around 4GB, nobody is making a 4GB memtable
+	size       uint32 // gives us max cap at around 4GB, nobody is making a 4GB memtable
 }
 
 var (
-	ErrKeyNotFound = errors.New("[SKIP_LIST]: Key not found in list.")
+	ErrKeyNotFound = errors.New("[SKIP_LIST]: Key not found in list")
 )
 
 func NewSkipList() *SkipList {
 	return &SkipList{
 		head:       newSkipListNode("", nil), // for now set to nil
 		currHeight: 1,
-		Size:       0,
+		size:       0,
 	}
 }
 
@@ -51,6 +51,10 @@ func coinFlipHeads() bool {
 	}
 
 	return false
+}
+
+func (sl *SkipList) Size() uint32 {
+	return sl.size
 }
 
 // search returns the predecessor of key at every active level and the matching
@@ -89,17 +93,18 @@ func (sl *SkipList) search(key string) (predecessors []*skipListNode, found *ski
 	return predecessors, found
 }
 
-func (sl *SkipList) Get(target_key string) ([]byte, error) {
-	_, found := sl.search(target_key) // we dont care about predecessors for the Get function
+func (sl *SkipList) Get(targetKey string) ([]byte, error) {
+	_, found := sl.search(targetKey) // we dont care about predecessors for the Get function
 
 	if found != nil {
 		return found.Val, nil
 	}
 
-	return nil, fmt.Errorf("%w: target_key = %s", ErrKeyNotFound, target_key)
+	return nil, fmt.Errorf("%w. targetKey = %s", ErrKeyNotFound, targetKey)
 }
 
 func (sl *SkipList) Put(key string, val []byte) error {
+	// TODO: update size
 	// calculate number of insertions
 	insHeight := uint8(1) // 1 is the lowest because we have to add to the first row
 	for {
@@ -150,17 +155,18 @@ func (sl *SkipList) Put(key string, val []byte) error {
 }
 
 // NOTE: Should not be used to physically remove keys from memtable.
-func (sl *SkipList) Delete(target_key string) error {
-	predecessors, found := sl.search(target_key)
+func (sl *SkipList) Delete(targetKey string) error {
+	// TODO: update size
+	predecessors, found := sl.search(targetKey)
 
 	if found == nil {
-		return fmt.Errorf("%w: target_key = %s", ErrKeyNotFound, target_key)
+		return fmt.Errorf("%w. targetKey = %s", ErrKeyNotFound, targetKey)
 	}
 
 	// rewire the predecessors
 	for _, predecessor := range predecessors {
 		next := predecessor.RightPtr
-		if next != nil && next.Key == target_key {
+		if next != nil && next.Key == targetKey {
 			predecessor.RightPtr = next.RightPtr
 		}
 	}

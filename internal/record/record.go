@@ -23,7 +23,7 @@ const (
 var (
 	endianness = binary.LittleEndian
 
-	ErrInvalidRecord = errors.New("[RECORD]: Invalid record. Size or type mismatch.")
+	ErrInvalidRecord = errors.New("[RECORD]: Invalid record. Size or type mismatch")
 )
 
 type Record struct {
@@ -57,11 +57,11 @@ func Deserialize(buf []byte) (*Record, error) {
 
 	bufLen := uint64(len(buf))
 	if keySize > bufLen {
-		return nil, fmt.Errorf("%w: keySize = %d, bufLen = %d", ErrInvalidRecord, keySize, bufLen)
+		return nil, fmt.Errorf("%w. keySize = %d, bufLen = %d", ErrInvalidRecord, keySize, bufLen)
 	}
 	total := uint64(HeaderSize + keySize + valueSize)
 	if total > bufLen {
-		return nil, fmt.Errorf("%w: total = %d, bufLen = %d", ErrInvalidRecord, total, bufLen)
+		return nil, fmt.Errorf("%w. total = %d, bufLen = %d", ErrInvalidRecord, total, bufLen)
 	}
 
 	key := string(buf[HeaderSize : HeaderSize+keySize])
