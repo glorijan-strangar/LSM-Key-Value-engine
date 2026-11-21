@@ -20,8 +20,8 @@ type Config struct {
 }
 
 var (
-	ReadFileError  = errors.New("[CONFIG]: There was an issue reading the config file.")
-	JSONParseError = errors.New("[CONFIG]: There was an issue parsing the JSON config values.")
+	ReadFileError  = errors.New("[CONFIG]: There was an issue reading the config file")
+	JSONParseError = errors.New("[CONFIG]: There was an issue parsing the JSON config values")
 )
 
 func NewDefaultConfig() *Config {
@@ -47,7 +47,7 @@ func LoadConfig() (*Config, error) {
 			return config, nil // if the file doesnt even exist we'll return the default
 		}
 
-		return nil, fmt.Errorf("%w: %s", ReadFileError, err)
+		return nil, fmt.Errorf("%w. %s", ReadFileError, err)
 	}
 
 	// if the file exists, but is completely empty, also return the default without errors
@@ -56,7 +56,7 @@ func LoadConfig() (*Config, error) {
 	}
 
 	if err := json.Unmarshal(configData, config); err != nil {
-		return nil, fmt.Errorf("%w: %s", JSONParseError, err)
+		return nil, fmt.Errorf("%w. %s", JSONParseError, err)
 	}
 
 	return config, nil
