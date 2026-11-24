@@ -137,6 +137,7 @@ func (w *WAL) Append(rec *record.Record) error {
 		first = false
 	}
 
+	w.lsn++ // increase log sequence number as we've finished writing
 	return nil
 }
 
